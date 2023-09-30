@@ -7,7 +7,7 @@ The user can select, what type of scan they want to run, currently 4 different t
   Scanning specific TCP ports and 
   Scanning all TCP and UDP ports
 
-Once selected the above scans will be concluded on the specified data range, the results will be printed and stored in a dataframe. 
+Once selected, the above scans will be concluded on the specified data range, the results will be printed and stored in a dataframe. 
 At the end of the execution the dataframe is written in a .csv file. 
 
 Please note, that TCP/UDP portscanning can take a long time to be finished. 
