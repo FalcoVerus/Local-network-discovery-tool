@@ -4,6 +4,7 @@
 # pip install psutil
 # pip install ping3
 # pip install scapy
+# pip install mac-vendor-lookup
 
 import re
 import ipaddress
@@ -12,6 +13,7 @@ import socket
 import nmap
 from ping3 import ping, verbose_ping
 from scapy.all import ARP, Ether, srp
+from mac_vendor_lookup import MacLookup
 import pandas as pd
 
 ## Check avaiable network interfaces with psutil
@@ -66,7 +68,7 @@ def get_netmask():
     while True:
         user_input = input("Enter input in the form of '/DD': ")
         if valid_netmask(user_input):
-            return user_input  # Return the valid input
+            return user_input
         else:
             print("Invalid input format. Please enter in the form of '/DD'.")
 
@@ -78,11 +80,11 @@ ip_range = start_ip + netmask_range
 ip_target = start_ip + '-' + end_ip.split('.')[-1]
 
 ## Createing a dataframe to store all the collected data
-ip_df = pd.DataFrame(columns=['IP', 'ICMP response time (ms)', 'ARP', 'Spec ports', 'TCP', 'UDP'])
+ip_df = pd.DataFrame(columns=['IP', 'ICMP response time (ms)', 'ARP', 'Vendor', 'Spec ports', 'TCP', 'UDP'])
 
 for i in range(int(start_ip.split('.')[-1]), int(end_ip.split('.')[-1]) + 1):
     ip = f"{start_ip.rsplit('.', 1)[0]}.{i}"
-    ip_df.loc[len(ip_df)] = [ip, None, None, None, None, None]
+    ip_df.loc[len(ip_df)] = [ip, None, None, None, None, None, None]
 
 ### ICMP ping each IP address with ping3
 def icmp():
@@ -93,7 +95,18 @@ def icmp():
             print(f'{ip} is responding to ping: {response_time} ms')
             ip_df.loc[ip_df['IP'] == ip, 'ICMP response time (ms)'] = response_time
 
+# Update the vendor list
+MacLookup().update_vendors
 
+### Vendor lookup
+def get_vendor(mac_address):
+    mac_lookup = MacLookup()
+    try:
+        vendor = mac_lookup.lookup(mac_address)
+        return vendor
+    except Exception as e:
+        return None
+    
 ### ARP check on the subnet with Scapy
 def arp():
     # Create an ARP request packet
@@ -103,12 +116,13 @@ def arp():
     ether = Ether(dst='ff:ff:ff:ff:ff:ff')
 
     packet = ether/arp
-    arp_result = srp(packet, timeout=3, verbose=0)[0]
+    arp_result = srp(packet, timeout=3, verbose=0)[0]    
 
     # Iterate through responses and print live hosts
     for sent, received in arp_result:
-        print(f'IP Address: {received.psrc} is alive')
-        ip_df.loc[ip_df['IP'] == received.psrc, 'ARP'] = 'alive'
+        print(f'IP Address: {received.psrc} on {received.hwsrc} is alive')
+        ip_df.loc[ip_df['IP'] == received.psrc, 'ARP'] = received.hwsrc
+        ip_df.loc[ip_df['IP'] == received.psrc, 'Vendor'] = get_vendor(received.hwsrc)
 
 
 ### Socket Port Scanning
